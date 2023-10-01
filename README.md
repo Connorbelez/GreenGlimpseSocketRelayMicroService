@@ -8,6 +8,9 @@ server.js subscribes to that data and relays it the nextJS frontend via websocke
 This is a barebones implementation where the user chooses the topic to sub to on the frontend. 
 
 To test:
+pull repo
+
+get the solace credentials from our discord, put them in the indicated spot in samplePublisher.js and server.js
 
 node server.js
 
