@@ -1,7 +1,7 @@
 const url = 'wss://mr-connection-y5r00qk8jwd.messaging.solace.cloud:443';
 const vpn = 'greenglimpseevents';
 const username = 'solace-cloud-client';
-const pass = '23vj69o8cd7uihpergkd4p6152';
+const pass = '';
 
 /*
  * Licensed to the Apache Software Foundation (ASF) under one
