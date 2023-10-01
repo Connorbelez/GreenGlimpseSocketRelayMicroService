@@ -34,10 +34,12 @@ io.on('connection', (socket) => {
 });
 
 
-const url = 'wss://mr-connection-y5r00qk8jwd.messaging.solace.cloud:443';
-const vpn = 'greenglimpseevents';
-const username = 'solace-cloud-client';
-const pass = '';
+
+//=============SOLACE CREDENTIALS GO HERE===============
+
+
+//======================================================
+
 
 var GuaranteedSubscriber = function (queueName, topicName) {
     'use strict';
