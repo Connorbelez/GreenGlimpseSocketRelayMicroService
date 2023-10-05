@@ -23,12 +23,12 @@ function generateTrendingEmissionsData() {
 
     // Initialize starting values for each stage
     const initialEmissions = {
-        RawMineral: 5,
-        Manufacturing: 15,
-        Transportation: 10,
-        Operations: 30,
-        Usage: 15,
-        Waste: 10,
+        RawMineral: 50,
+        Manufacturing: 50,
+        Transportation: 50,
+        Operations: 50,
+        Usage: 50,
+        Waste: 50,
     };
 
     for (let stage in initialEmissions) {
