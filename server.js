@@ -1,12 +1,13 @@
 const express = require('express');
 const http = require('http');
+// const socketIo = require('socket.io');
 const solace = require('solclientjs').debug;
 const cors = require('cors');
-const io = require('socket.io');
 
+// Initialize Express and HTTP server
 const app = express();
 const server = http.createServer(app);
-const socketIoServer = io(server, {
+const io = require('socket.io')(server, {
     cors: {
         origin: "http://localhost:3000",
         methods: ["GET", "POST"]
@@ -14,6 +15,24 @@ const socketIoServer = io(server, {
 });
 
 app.use(cors({ origin: 'http://localhost:3000' }));
+// Solace setup (from your provided code)
+// ... [Your Solace setup code here] ...
+
+// When a client connects via socket.io
+io.on('connection', (socket) => {
+    console.log('Client connected');
+
+    // Handle subscription requests from the client
+    socket.on('subscribe', (topic) => {
+        console.log(`User ${socket.id} subscribed to topic: ${topic}`);
+        socket.subscribedTopic = topic;
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Client disconnected');
+    });
+});
+
 
 //============= SOLACE CREDENTIALS GO HERE ===============
 const url = config.url;
@@ -26,6 +45,7 @@ var GuaranteedSubscriber = function (queueName, topicName) {
     'use strict';
     var subscriber = {};
     subscriber.session = null;
+    subscriber.flow = null;
     subscriber.queueName = queueName;
     subscriber.consuming = false;
     subscriber.topicName = topicName;
@@ -53,13 +73,17 @@ var GuaranteedSubscriber = function (queueName, topicName) {
             subscriber.log('Already connected and ready to consume messages.');
             return;
         }
+        console.log("subscriber.connect() called 74" )
+
         subscriber.log('Connecting to Solace PubSub+ Event Broker using url: ' + url);
         subscriber.log('Client username: ' + username);
         subscriber.log('Solace PubSub+ Event Broker VPN name: ' + vpn);
 
+
         // create session
         try {
             subscriber.session = solace.SolclientFactory.createSession({
+                // solace.SessionProperties
                 url:      url,
                 vpnName:  vpn,
                 userName: username,
@@ -69,7 +93,7 @@ var GuaranteedSubscriber = function (queueName, topicName) {
             subscriber.log(error.toString());
         }
 
-        // Define session event listeners
+        // define session event listeners
         subscriber.session.on(solace.SessionEventCode.UP_NOTICE, function (sessionEvent) {
             subscriber.log('=== Successfully connected and ready to start the message subscriber. ===');
             subscriber.startConsume();
@@ -86,7 +110,7 @@ var GuaranteedSubscriber = function (queueName, topicName) {
                 subscriber.session = null;
             }
         });
-        subscriber.connectToSolace();
+        subscriber.connectToSolace();   
     };
 
     subscriber.connectToSolace = function () {
@@ -99,6 +123,7 @@ var GuaranteedSubscriber = function (queueName, topicName) {
 
     // Starts consuming messages from Solace PubSub+ Event Broker
     subscriber.startConsume = function () {
+        console.log("Subscriber startConsume() called 122")
         if (subscriber.session !== null) {
             if (subscriber.consuming) {
                 subscriber.log('Already started subscriber for queue "' + subscriber.queueName + '" and ready to receive messages.');
@@ -107,70 +132,61 @@ var GuaranteedSubscriber = function (queueName, topicName) {
                 try {
                     // Create a message subscriber
                     subscriber.messageSubscriber = subscriber.session.createMessageConsumer({
+                        // solace.MessageConsumerProperties
                         queueDescriptor: { name: subscriber.queueName, type: solace.QueueType.QUEUE },
-                        acknowledgeMode: solace.MessageConsumerAcknowledgeMode.CLIENT,
-                        createIfMissing: true
+                        acknowledgeMode: solace.MessageConsumerAcknowledgeMode.CLIENT, // Enabling Client ack
+                        createIfMissing: true // Create queue if not exists
                     });
-
                     // Define message subscriber event listeners and attach to the message subscriber
                     subscriber.messageSubscriber.on(solace.MessageConsumerEventName.UP, function () {
                         subscriber.subscribe();
                         subscriber.consuming = true;
                         subscriber.log('=== Ready to receive messages. ===');
                     });
-
                     subscriber.messageSubscriber.on(solace.MessageConsumerEventName.CONNECT_FAILED_ERROR, function () {
                         subscriber.consuming = false;
-                        subscriber.log('=== Error: the message subscriber could not bind to queue "' + subscriber.queueName + '" ===\n   Ensure this queue exists on the message router vpn');
+                        subscriber.log('=== Error: the message subscriber could not bind to queue "' + subscriber.queueName +
+                            '" ===\n   Ensure this queue exists on the message router vpn');
                         subscriber.exit();
                     });
-
                     subscriber.messageSubscriber.on(solace.MessageConsumerEventName.DOWN, function () {
                         subscriber.consuming = false;
                         subscriber.log('=== The message subscriber is now down ===');
                     });
-
                     subscriber.messageSubscriber.on(solace.MessageConsumerEventName.DOWN_ERROR, function () {
                         subscriber.consuming = false;
                         subscriber.log('=== An error happened, the message subscriber is down ===');
                     });
-
                     subscriber.messageSubscriber.on(solace.MessageConsumerEventName.SUBSCRIPTION_ERROR, function (sessionEvent) {
-                        subscriber.log('Cannot subscribe to topic ' + sessionEvent.reason);
+                      subscriber.log('Cannot subscribe to topic ' + sessionEvent.reason);
                     });
-
                     subscriber.messageSubscriber.on(solace.MessageConsumerEventName.SUBSCRIPTION_OK, function (sessionEvent) {
-                        if (subscriber.subscribed) {
-                            subscriber.subscribed = false;
-                            subscriber.log('Successfully unsubscribed from topic: ' + sessionEvent.correlationKey);
-                        } else {
-                            subscriber.subscribed = true;
-                            subscriber.log('Successfully subscribed to topic: ' + sessionEvent.correlationKey);
-                            subscriber.log('=== Ready to receive messages. ===');
-                        }
+                      if (subscriber.subscribed) {
+                        subscriber.subscribed = false;
+                        subscriber.log('Successfully unsubscribed from topic: ' + sessionEvent.correlationKey);
+                      } else {
+                        subscriber.subscribed = true;
+                        subscriber.log('Successfully subscribed to topic: ' + sessionEvent.correlationKey);
+                        subscriber.log('=== Ready to receive messages. ===');
+                      }
                     });
-
                     // Define message received event listener
                     subscriber.messageSubscriber.on(solace.MessageConsumerEventName.MESSAGE, function (message) {
-                        subscriber.log('Received message: "' + message.getBinaryAttachment() + '",' +
-                            ' details:\n' + message.dump());
+
                         const msg = message.getBinaryAttachment();
                         const details = message.dump();
-                        console.log('Received message: "' + msg + '",' +
-                            ' details:\n' + details);
-
-                        // Emit the message to all connected Socket.IO clients
-                        socketIoServer.emit('message', msg);
 
                         const dest = message.getDestination();
-                        console.log("Destination: " + dest.getName());
 
-                        if (solaceMessageHandler(msg, details, dest)){
+                        if (solaceMessageHandler(msg, details, dest, io)){
+                            console.log("\n\n\n =============== back from messagehandler")
                             message.acknowledge();
                         }
-                    });
 
+                    });
+                    
                     // Connect the message subscriber
+                    console.log("Connecting message subscriber!!! FROM MESSAGE COMSUME");
                     subscriber.messageSubscriber.connect();
                 } catch (error) {
                     subscriber.log(error.toString());
@@ -183,34 +199,34 @@ var GuaranteedSubscriber = function (queueName, topicName) {
 
     // Subscribes to topic on Solace PubSub+ Event Broker
     subscriber.subscribe = function () {
-        if (subscriber.messageSubscriber !== null) {
-            if (subscriber.subscribed) {
-                subscriber.log('Already subscribed to "' + subscriber.topicName
-                    + '" and ready to receive messages.');
-            } else {
-                subscriber.log('Subscribing to topic: ' + subscriber.topicName);
-                try {
-                    subscriber.messageSubscriber.addSubscription(
-                        solace.SolclientFactory.createTopicDestination(subscriber.topicName),
-                        subscriber.topicName,
-                        10000
-                    );
-                } catch (error) {
-                    subscriber.log(error.toString());
-                }
-            }
+      if (subscriber.messageSubscriber !== null) {
+        if (subscriber.subscribed) {
+          subscriber.log('Already subscribed to "' + subscriber.topicName
+              + '" and ready to receive messages.');
         } else {
-            subscriber.log('Cannot subscribe because not connected to Solace PubSub+ Event Broker.');
+          subscriber.log('Subscribing to topic: ' + subscriber.topicName);
+          try {
+            subscriber.messageSubscriber.addSubscription(
+              solace.SolclientFactory.createTopicDestination(subscriber.topicName),
+              subscriber.topicName, // correlation key as topic name
+              10000 // 10 seconds timeout for this operation
+            );
+          } catch (error) {
+            subscriber.log(error.toString());
+          }
         }
+      } else {
+        subscriber.log('Cannot subscribe because not connected to Solace PubSub+ Event Broker.');
+      }
     };
-
+  
     subscriber.exit = function () {
         subscriber.unsubscribe();
         setTimeout(function () {
-            subscriber.stopConsume();
-            subscriber.disconnect();
-            process.exit();
-        }, 1000);
+          subscriber.stopConsume();
+          subscriber.disconnect();
+          process.exit();
+        }, 1000); // wait for 1 second to get confirmation on removeSubscription
     };
 
     // Disconnects the subscriber from queue on Solace PubSub+ Event Broker
@@ -236,25 +252,25 @@ var GuaranteedSubscriber = function (queueName, topicName) {
 
     // Unsubscribes from topic on Solace PubSub+ Event Broker
     subscriber.unsubscribe = function () {
-        if (subscriber.session !== null) {
-            if (subscriber.subscribed) {
-                subscriber.log('Unsubscribing from topic: ' + subscriber.topicName);
-                try {
-                    subscriber.messageSubscriber.removeSubscription(
-                        solace.SolclientFactory.createTopicDestination(subscriber.topicName),
-                        subscriber.topicName,
-                        10000
-                    );
-                } catch (error) {
-                    subscriber.log(error.toString());
-                }
-            } else {
-                subscriber.log('Cannot unsubscribe because not subscribed to the topic "' +
-                    subscriber.topicName + '"');
-            }
+      if (subscriber.session !== null) {
+        if (subscriber.subscribed) {
+          subscriber.log('Unsubscribing from topic: ' + subscriber.topicName);
+          try {
+            subscriber.messageSubscriber.removeSubscription(
+              solace.SolclientFactory.createTopicDestination(subscriber.topicName),
+              subscriber.topicName, // correlation key as topic name
+              10000 // 10 seconds timeout for this operation
+            );
+          } catch (error) {
+            subscriber.log(error.toString());
+          }
         } else {
-            subscriber.log('Cannot unsubscribe because not connected to Solace PubSub+ Event Broker.');
+          subscriber.log('Cannot unsubscribe because not subscribed to the topic "'
+              + subscriber.topicName + '"');
         }
+      } else {
+        subscriber.log('Cannot unsubscribe because not connected to Solace PubSub+ Event Broker.');
+      }
     };
 
     // Gracefully disconnects from Solace PubSub+ Event Broker
@@ -264,7 +280,7 @@ var GuaranteedSubscriber = function (queueName, topicName) {
             try {
                 setTimeout(function () {
                     subscriber.session.disconnect();
-                }, 1000);
+                }, 1000); // wait for 1 second to get confirmation on removeSubscription
             } catch (error) {
                 subscriber.log(error.toString());
             }
@@ -276,31 +292,47 @@ var GuaranteedSubscriber = function (queueName, topicName) {
     return subscriber;
 };
 
-function solaceMessageHandler(msg, detail, dest){
+
+
+
+
+
+function solaceMessageHandler(msg, detail, dest, io){
     console.log("msg: " + msg);
     console.log("detail: " + detail);
-
-    // Emit the message to all connected Socket.IO clients
-    socketIoServer.emit('message', msg);
-
-    return true;
+    io.sockets.sockets.forEach((socket) => {
+        if(socket.subscribedTopic === dest.getName()){
+            console.log("Socket TOpic: " + socket.subscribedTopic)
+            console.log("Emitting message to client: " + socket.id)
+            socket.emit('message', msg);
+        }
+    });
+    return true
 }
+//ToDo: Add logic to relay the message to socket.io clients based on their subscriptions
+//ToDo: Add some sort of Auth
+//ToDo: Put the relay in a callback function. REFACOTR!
+// Relay the message to socket.io clients based on their subscriptions
+
+
+
 
 // Initialize factory with the most recent API defaults
 var factoryProps = new solace.SolclientFactoryProperties();
 factoryProps.profile = solace.SolclientFactoryProfiles.version10;
 solace.SolclientFactory.init(factoryProps);
 
-// Enable logging to JavaScript console at WARN level
+// enable logging to JavaScript console at WARN level
+// NOTICE: works only with ('solclientjs').debug
 solace.SolclientFactory.setLogLevel(solace.LogLevel.WARN);
 
-// Create the consumer, specifying the name of the queue
+// create the consumer, specifying the name of the queue
 var subscriber = new GuaranteedSubscriber('tutorial/queue', 'data/testIOT1');
 
-// Subscribe to messages on Solace PubSub+ Event Broker
+// subscribe to messages on Solace PubSub+ Event Broker
 subscriber.run(process.argv);
 
-// Wait to be told to exit
+// wait to be told to exit
 subscriber.log("Press Ctrl-C to exit");
 process.stdin.resume();
 
@@ -308,9 +340,13 @@ process.on('SIGINT', function () {
     'use strict';
     subscriber.exit();
 });
-
 // Start the HTTP server
 const PORT = 3001;
 server.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });
+
+
+
+
+
