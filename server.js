@@ -16,10 +16,10 @@ const socketIoServer = io(server, {
 app.use(cors({ origin: 'http://localhost:3000' }));
 
 //============= SOLACE CREDENTIALS GO HERE ===============
-const url = 'wss://mr-connection-y5r00qk8jwd.messaging.solace.cloud:443';
-const vpn = 'greenglimpseevents';
-const username = 'solace-cloud-client';
-const pass = '23vj69o8cd7uihpergkd4p6152';
+const url = config.url;
+const vpn = config.vpn;
+const username = config.username;
+const pass = config.pass;
 //======================================================
 
 var GuaranteedSubscriber = function (queueName, topicName) {
