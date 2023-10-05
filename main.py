@@ -44,7 +44,7 @@ else:
     # Generate comments using the GPT-3 API
     response = openai.Completion.create(
         engine="text-davinci-002",
-        prompt=f"Please analyze the following dataset and provide feedback on how to reduce carbon emissions:\n{dataset_text}\n\nComments:",
+        prompt=f"Please analyze the following dataset and provide feedback on how to reduce carbon emissions. Also tell the company what financial insentives they qualify for:\n{dataset_text}\n\nComments:",
         max_tokens=150  # Adjust as needed
     )
 
