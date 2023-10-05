@@ -1,5 +1,61 @@
 /*jslint es6 node:true devel:true*/
 const solace = require('solclientjs').debug; // logging supported
+const config = require('./config');
+
+// Initialize factory with the most recent API defaults
+var factoryProps = new solace.SolclientFactoryProperties();
+factoryProps.profile = solace.SolclientFactoryProfiles.version10;
+solace.SolclientFactory.init(factoryProps);
+
+// Enable logging to JavaScript console at WARN level
+solace.SolclientFactory.setLogLevel(solace.LogLevel.WARN);
+
+// Update Solace connection details here
+const url = config.url;
+const vpn = config.vpn;
+const username = config.username;
+const pass = config.pass;
+
+// Function to generate emissions data with an oscillating trend
+function generateTrendingEmissionsData() {
+    const months = 12; // Number of months
+    const emissionsData = {};
+
+    // Initialize starting values for each stage
+    const initialEmissions = {
+        RawMineral: 5,
+        Manufacturing: 15,
+        Transportation: 10,
+        Operations: 30,
+        Usage: 15,
+        Waste: 10,
+    };
+
+    for (let stage in initialEmissions) {
+        emissionsData[stage] = [];
+        const initialEmission = initialEmissions[stage];
+        let currentEmission = initialEmission;
+        let increasing = true; // Flag to indicate if emissions are increasing or decreasing
+
+        for (let month = 1; month <= months; month++) {
+            // Oscillate between increasing and decreasing emissions
+            if (increasing) {
+                currentEmission += (Math.random() * 3); // Increase emissions
+            } else {
+                currentEmission -= (Math.random() * 3); // Decrease emissions
+            }
+
+            // Toggle the flag if emissions reach certain bounds (you can adjust these bounds)
+            if (currentEmission <= initialEmission - 10 || currentEmission >= initialEmission + 10) {
+                increasing = !increasing;
+            }
+
+            emissionsData[stage].push(currentEmission.toFixed(2)); // Store emissions rounded to 2 decimal places
+        }
+    }
+
+    return JSON.stringify(emissionsData);
+}
 
 var TopicPublisher = function (solaceModule, topicName) {
     'use strict';
@@ -19,20 +75,6 @@ var TopicPublisher = function (solaceModule, topicName) {
 
     publisher.log('\n*** Publisher to topic "' + publisher.topicName + '" is ready to connect ***');
 
-    // Generate random but realistic emissions data for different stages
-    publisher.generateRandomEmissions = function () {
-        const getRandomValue = (min, max) => Math.random() * (max - min) + min;
-        
-        const data = {
-            RawMineral: [getRandomValue(0, 10), getRandomValue(0, 10)],
-            Manufacturing: [getRandomValue(10, 30), getRandomValue(10, 30)],
-            Transportation: [getRandomValue(5, 15), getRandomValue(5, 15)],
-            Operations: [getRandomValue(20, 40), getRandomValue(20, 40)],
-            Usage: [getRandomValue(10, 25), getRandomValue(10, 25)],
-            Waste: [getRandomValue(5, 15), getRandomValue(5, 15)],
-        };
-        return JSON.stringify(data);
-    };
 
     // main function
     publisher.run = function (argv) {
@@ -53,8 +95,8 @@ var TopicPublisher = function (solaceModule, topicName) {
         try {
             publisher.session = solace.SolclientFactory.createSession({
                 // solace.SessionProperties
-                url:      url,
-                vpnName:  vpn,
+                url: url,
+                vpnName: vpn,
                 userName: username,
                 password: pass,
             });
@@ -66,7 +108,7 @@ var TopicPublisher = function (solaceModule, topicName) {
             publisher.log('=== Successfully connected and ready to publish messages. ===');
             // Start publishing random but realistic emissions data at regular intervals
             setInterval(function () {
-                const emissionsData = publisher.generateRandomEmissions();
+                const emissionsData = generateTrendingEmissionsData();
                 publisher.publish(emissionsData);
             }, 1000); // Publish every second
         });
@@ -132,21 +174,6 @@ var TopicPublisher = function (solaceModule, topicName) {
 
     return publisher;
 };
-
-// Initialize factory with the most recent API defaults
-var factoryProps = new solace.SolclientFactoryProperties();
-factoryProps.profile = solace.SolclientFactoryProfiles.version10;
-solace.SolclientFactory.init(factoryProps);
-
-// enable logging to JavaScript console at WARN level
-// NOTICE: works only with ('solclientjs').debug
-solace.SolclientFactory.setLogLevel(solace.LogLevel.WARN);
-
-// Update Solace connection details here
-const url = config.url;
-const vpn = config.vpn;
-const username = config.username;
-const pass = config.pass;
 
 // create the publisher, specifying the name of the subscription topic
 var publisher = new TopicPublisher(solace, 'data/testIOT1');

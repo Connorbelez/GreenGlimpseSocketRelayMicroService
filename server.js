@@ -3,6 +3,7 @@ const http = require('http');
 // const socketIo = require('socket.io');
 const solace = require('solclientjs').debug;
 const cors = require('cors');
+const config = require('./config');
 
 // Initialize Express and HTTP server
 const app = express();
